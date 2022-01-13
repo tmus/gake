@@ -8,18 +8,25 @@ import (
 	"github.com/tmus/gake"
 )
 
+var contextKey struct{}
+
 func main() {
 	r := gake.Runner()
-	t1 := gake.Rule("build_world").Recipe(func(ctx context.Context) error {
-		_, cancel := context.WithCancel(ctx)
-		fmt.Println("Building world")
-		cancel()
-		return nil
-	}).Phony(true)
-	t2 := gake.Rule("hello_world").Recipe(func(ctx context.Context) error {
-		fmt.Println("Hello world")
-		return nil
-	}).Dependencies(t1).Phony(true)
+
+	t1 := gake.Rule("build_world").
+		Recipe(func(ctx context.Context) (context.Context, error) {
+			ctx = context.WithValue(ctx, contextKey, "asd")
+			fmt.Println("Building world")
+			return ctx, nil
+		})
+
+	t2 := gake.Rule("hello_world").
+		Dependencies(t1).
+		Recipe(func(ctx context.Context) (context.Context, error) {
+			fmt.Println(ctx.Value(contextKey))
+			fmt.Println("Hello world")
+			return ctx, nil
+		})
 
 	r.DefaultGoal(t2)
 

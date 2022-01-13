@@ -2,14 +2,16 @@ package gake
 
 import (
 	"context"
+	"errors"
 	"fmt"
 )
 
 var (
 	errTargetNotFound = "target `%s` not found"
+	errEmptyRunner    = errors.New("runner is empty")
 )
 
-type recipe func(ctx context.Context) error
+type recipe func(ctx context.Context) (context.Context, error)
 
 type rule struct {
 	target string
@@ -26,6 +28,8 @@ type runner struct {
 func Rule(target string) rule {
 	return rule{
 		target: target,
+		// TODO
+		phony: true,
 	}
 }
 
@@ -44,12 +48,13 @@ func (r rule) Dependencies(rules ...rule) rule {
 	return r
 }
 
-func (r rule) run(ctx context.Context) error {
+func (r rule) run(ctx context.Context) (context.Context, error) {
+	var err error
 	if r.phony {
 		for _, d := range r.deps {
-			err := d.run(ctx)
+			ctx, err = d.run(ctx)
 			if err != nil {
-				return err
+				return ctx, err
 			}
 		}
 
@@ -57,7 +62,7 @@ func (r rule) run(ctx context.Context) error {
 	}
 
 	// TODO // Non-phony targets may not always run
-	return nil
+	return ctx, nil
 }
 
 func Runner() runner {
@@ -72,24 +77,24 @@ func (r *runner) DefaultGoal(rule rule) {
 	r.defaultGoal = rule
 }
 
-func (r runner) Run(args []string) {
-	var rule rule
+func (r runner) Run(args []string) (context.Context, error) {
+	if len(r.rules) == 0 {
+		return context.Background(), errEmptyRunner
+	}
 	if len(args) == 1 {
 		if r.defaultGoal.target == "" {
-			r.rules[0].run(context.Background())
+			return r.rules[0].run(context.Background())
 		} else {
-			r.defaultGoal.run(context.Background())
+			return r.defaultGoal.run(context.Background())
 		}
-
-		return
 	}
 
 	rule, err := r.findRule(args[1])
 	if err != nil {
-		panic(err)
+		return context.Background(), err
 	}
 
-	rule.run(context.Background())
+	return rule.run(context.Background())
 }
 
 func (r runner) findRule(target string) (rule, error) {
