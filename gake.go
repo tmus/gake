@@ -9,15 +9,22 @@ import (
 var (
 	errTargetNotFound = "target `%s` not found"
 	errEmptyRunner    = errors.New("runner is empty")
+
+	defaultPredicate = func(ctx context.Context) (context.Context, bool) {
+		return ctx, true
+	}
 )
 
 type recipe func(ctx context.Context) (context.Context, error)
 
+type predicate func(ctx context.Context) (context.Context, bool)
+
 type rule struct {
-	target string
-	fn     recipe
-	deps   []rule
-	phony  bool
+	target    string
+	fn        recipe
+	deps      []rule
+	phony     bool
+	predicate predicate
 }
 
 type runner struct {
@@ -28,9 +35,9 @@ type runner struct {
 // Rule is a single task that exists on a Runner.
 func Rule(target string) rule {
 	return rule{
-		target: target,
-		// TODO
-		phony: true,
+		target:    target,
+		phony:     true,
+		predicate: defaultPredicate,
 	}
 }
 
@@ -49,7 +56,17 @@ func (r rule) Dependencies(rules ...rule) rule {
 	return r
 }
 
+func (r rule) Predicate(fn predicate) rule {
+	r.predicate = fn
+	return r
+}
+
 func (r rule) run(ctx context.Context) (context.Context, error) {
+	ctx, ok := r.predicate(ctx)
+	if !ok {
+		return ctx, nil
+	}
+
 	var err error
 	if r.phony {
 		for _, d := range r.deps {
