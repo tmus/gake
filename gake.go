@@ -25,6 +25,7 @@ type runner struct {
 	defaultGoal rule
 }
 
+// Rule is a single task that exists on a Runner.
 func Rule(target string) rule {
 	return rule{
 		target: target,
@@ -65,6 +66,7 @@ func (r rule) run(ctx context.Context) (context.Context, error) {
 	return ctx, nil
 }
 
+// Runner contains multiple rules and orchestrates tasks being ran.
 func Runner() runner {
 	return runner{}
 }
@@ -84,9 +86,9 @@ func (r runner) Run(args []string) (context.Context, error) {
 	if len(args) == 1 {
 		if r.defaultGoal.target == "" {
 			return r.rules[0].run(context.Background())
-		} else {
-			return r.defaultGoal.run(context.Background())
 		}
+
+		return r.defaultGoal.run(context.Background())
 	}
 
 	rule, err := r.findRule(args[1])
